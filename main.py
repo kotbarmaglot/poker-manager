@@ -3,6 +3,8 @@ import telebot, sqlite3, json, os.path
 
 from telebot import types
 
+from telebot.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+
 from datetime import datetime
 
 from telebot.storage import StateMemoryStorage
@@ -20,41 +22,12 @@ br = int
 status = ['yes', 'no']
 id = str
 dlina = str
-
-
-
-
-
-
-
-
-jsonBD = {
-    "katka": [
-        {
-            "id": id,
-            "session": [
-                {
-                    "Start": start,
-                    "End": end,
-                    "Dlina": dlina
-                }
-            ]
-        }
-    ],
-    "theory": [
-        {
-            "id": id,
-            "session": [
-                {
-                    "Start": start,
-                    "End": end,
-                    "Dlina": dlina
-                }
-            ]
-        }
-    ]
-}
-
+start_date = str
+start_time = str
+end_time = str
+br_ipoker = str
+br_pokerking = str
+start_day = str
 
 state_storage = StateMemoryStorage()
 
@@ -66,23 +39,28 @@ class MyStates(StatesGroup):
     start_katka = State()
     katka = State()
     start_theory = State()
+    end_katka = State()
 
 
 @bot.message_handler(commands=['start'])
 def button(message):
 
+    msg = bot.send_message(message.from_user.id, "Во сколько ты сегодня проснулся?", reply_markup=types.ReplyKeyboardRemove())
+    bot.register_next_step_handler(msg, yoga)
+
+
+def yoga(message):
+    msg = bot.send_message(message.from_user.id, "Во сколько вчера заснул?")
+    bot.register_next_step_handler(msg, start_day)
+    
+def start_day(message):
     markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1=types.KeyboardButton("Начать сессию")
     markup.add(item1)
     item2=types.KeyboardButton("Начать теорию")
     markup.add(item2)
-
-    date = datetime.now()
-    str_date = date.strftime("%m/%d/%Y, %H:%M:%S")
+    bot.send_message(message.chat.id,'Отлично! Начнем катать или заниматься теорией?\n sadf',reply_markup=markup)
     bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
-    bot.send_message(message.chat.id,'Сейчас: '+str_date,reply_markup=markup)
-
-
 
 @bot.message_handler(state=MyStates.start)
 def button(message):
@@ -99,64 +77,13 @@ def button(message):
 
         id = date.strftime("%m/%d/%Y")
         katkastart = date.strftime("%H:%M:%S")
-        if os.path.exists('data.txt'):
-            print('файл найден жсон')
-            with open('data.txt') as json_file:
-                data = json.load(json_file)
 
-            length = len(data['day'])
+        con = sqlite3.connect("PokerManager.db")
+        cur = con.cursor()
 
-            print (length)
-            for x in range(length):
-                
-                if data['day'][x]['id'] == id:
-                    data['day'][x]['katka'].append([{
-                        "Start": katkastart,
-                        "End": '1',
-                        "Dlina": '1'
-                    }])
-                else:
-
-                    data['day'].append({
-                        'id': id,
-                        'katka': [{
-                                "Start": '1',
-                                "End": '1',
-                                "Dlina": '1'
-                        }],
-                        'theory': [{
-                                "Start": 'start',
-                                "End": 'end',
-                                "Dlina": 'dlina'
-                        }]
-                    })
-
-
-        else:
-            data = {}
-            data['day'] = []
-
-            data['day'].append({
-                'id': id,
-                'katka': [{
-                        "Start": '1',
-                        "End": '1',
-                        "Dlina": '1'
-                }],
-                'theory': [{
-                        "Start": 'start',
-                        "End": 'end',
-                        "Dlina": 'dlina'
-                }]
-            })
-            print('файла жсон нет, создам новый')
-
+        globals()['start_date'] = str_date
 
         
-
-        with open('data.txt', 'w') as outfile:
-            json.dump(data, outfile)
-
     else:
         markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
         item1=types.KeyboardButton("Закончить теорию")
@@ -195,91 +122,36 @@ def button(message):
     if inp not in ["Закончить сессию"]:
         bot.send_message(message.chat.id, 'Вы все еще катаетет, если хотите закончить сессию, нажмите "Закончить сессию"')
         return
+
+    bot.send_message(message.from_user.id, "Введи бр Ipoker в поле сообщения и нажми enter:", reply_markup=types.ReplyKeyboardRemove())
+
+
+    print(start_date)
+
+    date = datetime.now()
+    str_date = date.strftime("%m/%d/%Y, %H:%M:%S")
+
+    bot.set_state(message.from_user.id, MyStates.end_katka, message.chat.id)
+
+@bot.message_handler(state=MyStates.end_katka)
+def send_welcome(message):
+    globals()['br_ipoker'] = message.text
+    msg = bot.send_message(message.from_user.id, "Введи бр king в поле сообщения и нажми enter:")
+    bot.register_next_step_handler(msg, process_name_step)
+
+def process_name_step(message):
+    print(br_ipoker)
+    globals()['br_pokerking'] = message.text
+    print(br_pokerking)
+
     markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1=types.KeyboardButton("Начать сессию")
     markup.add(item1)
     item2=types.KeyboardButton("Начать теорию")
     markup.add(item2)
 
-    date = datetime.now()
-    str_date = date.strftime("%m/%d/%Y, %H:%M:%S")
-
-    bot.send_message(message.chat.id,'Вы закончили катать в: '+str_date,reply_markup=markup)
+    bot.send_message(message.chat.id,'Вы закончили катать в: '+br_pokerking+br_ipoker,reply_markup=markup)
     bot.set_state(message.from_user.id, MyStates.start, message.chat.id)
-
-
-
-# @bot.message_handler(content_types='text')
-# def message_reply(message):
-
-#     # conn = sqlite3.connect('poker-manager/db/stat.db')
-#     # cur = conn.cursor()
-#     # cur.execute("""CREATE TABLE IF NOT EXISTS sessions(
-#     #     date_session BLOB PRIMARY KEY,
-#     #     start_time BLOB,
-#     #     end_time BLOB,
-#     #     length INTEGER);
-#     # """)
-#     # conn.commit()
-
-
-#     if message.text=="Начать сессию":
-
-#         date = datetime.now()
-
-#         start = date.strftime("%H:%M:%S/%m-%d-%Y")
-
-#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#         item_1 = types.KeyboardButton('Закончить сессию')
-#         item_2 = types.KeyboardButton('Back🔙')
-#         markup.add(item_1, item_2)
-
-#         bot.send_message(message.chat.id, 'Вы начали сессию:' + start, reply_markup = markup)
-    
-#         # date_session = date.strftime("%m-%d-%Y")
-
-#         # session = (date_session, start_time)
-
-
-
-#         # print (start)
-#         # cur.execute("""INSERT INTO users(date_session, start_time) ;""", session)
-#         # conn.commit()
-
-
-#         # bot.send_message(message.chat.id,"Сессия запущена в " + start )
-
-#     elif message.text=="Начать теорию":
-#         # print (start)
-
-
-#         date = datetime.now()
-
-#         end = date.strftime("%H:%M:%S/%m-%d-%Y")
-
-#         date = datetime.now()
-
-#         start = date.strftime("%H:%M:%S/%m-%d-%Y")
-
-#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-#         item_1 = types.KeyboardButton('Закончить теорию')
-#         item_2 = types.KeyboardButton('Back🔙')
-#         markup.add(item_1, item_2)
-
-#         bot.send_message(message.chat.id, 'Вы начали теорию:' + start, reply_markup = markup)
-    
-#         print (end)
-
-#         # length = 
-
-
-
-
-#         # bot.send_message(message.chat.id,"Сессия окончена в " + end )
-
-        
-#     else:
-#         bot.send_message(message.chat.id,"Я не понимаю команду. Напишите /start чтобы запустить бота")
 
 
 bot.add_custom_filter(custom_filters.StateFilter(bot))
